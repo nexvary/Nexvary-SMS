@@ -1,77 +1,76 @@
-# Development handoff — 2026-11-20 (updated)
+# Development handoff — 2026-11-21 (final)
 
-Repository was empty. Main initialized with README only; app foundation is on `feature/android-sms-foundation`.
+Repository initialized on main with README only.
+All work is on `feature/android-sms-foundation` (open PR #1).
 
-## Implemented foundation (commit d4357b4)
-- Native Android Java, minSdk 26 / compileSdk+targetSdk 35; AGP 8.9.2, Gradle 8.11.1, Java 17.
-- Arabic RTL form, exact Nexvary Inc sender/profile, Egyptian mobile normalization, Unicode/GSM multipart estimate, explicit paid confirmation.
-- OkHttp 4.12.0 with retries and redirects disabled; one POST per explicit send, GET-only status lookup.
-- Persisted send lock before POST, in-process AtomicBoolean and serial executor. Unknown outcomes remain locked; manual portal review required before reset.
-- Optional AES-GCM Android Keystore key storage, forget action, screenshots/autofill/backup restricted. No key or SMS body in journal/logs.
-- Response ID/state/cost parsing. No SMS/contacts permissions, analytics, backend, AWS changes or paid external requests.
-- Fifteen JUnit policy tests and GitHub Actions tests/lint/APK-signature pipeline.
+## Commit history on feature branch
 
-## CI fixes applied (commits 48e83f9, db2d108)
+| Commit | Description |
+|--------|-------------|
+| d4357b4 | Initial foundation: Java/Android, security, 15 unit tests, CI pipeline |
+| 48e83f9 | Fix lint NewApi (windowLightNavigationBar), add TelnyxClientTest (12 HTTP mock tests) |
+| db2d108 | Fix org.json stub in JVM unit tests |
+| d86ce69 | Update HANDOFF doc with CI evidence |
+| ab7c96c | Premium dark UI redesign + API key security fix |
 
-### Fix 1: Lint NewApi error — `android:windowLightNavigationBar` (commit 48e83f9)
-- **Root cause:** `app/src/main/res/values/styles.xml` used `android:windowLightNavigationBar` which requires API 27, but `minSdk` was set to 26.
-- **Fix:** Split styles into `values/styles.xml` (without `windowLightNavigationBar`) and `values-v27/styles.xml` (with it). The v27 qualifier ensures lint sees the attribute is guarded by API level.
-- Also in this commit: added `BASE_URL` package-private field to `TelnyxClient` for testability; added `mockwebserver:4.12.0` test dependency; added `TelnyxClientTest.java` (12 HTTP mock tests).
+## Implemented features
 
-### Fix 2: `org.json.JSONObject` stubbed in JVM unit tests (commit db2d108)
-- **Root cause:** Android unit tests (`testDebugUnitTest`) run on JVM with `android.jar` stubs that throw `RuntimeException("Stub!")` for all Android API calls, including `org.json.JSONObject`. `TelnyxClient` uses `JSONObject` to build POST body and parse responses. 9 of 12 `TelnyxClientTest` tests failed; only the 3 that expected `Exception` to be thrown passed (because `RuntimeException` extends `Exception`).
-- **Fix:** Added `testImplementation 'org.json:json:20231013'` to `app/build.gradle`. This puts the real Maven Central `org.json` implementation before the Android stub on the test classpath.
+- Native Android Java, minSdk 26 / compileSdk+targetSdk 35; AGP 8.9.2, Gradle 8.11.1, Java 17
+- Full Arabic RTL interface with premium dark theme (#0A0A12 bg, #C9A227 gold branding, #12C3AA teal accents)
+- Exact Nexvary Inc sender / profile `4001a1ea-906a-4085-b6a2-9188edac65b8`
+- Egyptian mobile number normalisation (+2010/11/12/15 prefixes only)
+- Unicode/GSM multipart estimate with live counter
+- Explicit paid-send confirmation dialog (shows recipient, segment count, message text)
+- OkHttp 4.12.0 with retries and redirects disabled; one POST per explicit send
+- GET-only status refresh (never retriggers a send)
+- Persisted send lock before POST; unknown outcomes remain locked until user reviews Telnyx portal
+- Optional AES-GCM Android Keystore key storage with Save/Forget buttons
+- Security fix: saved key is no longer auto-displayed in the text field — vault is used internally
+- Status labels distinguish: accepted / sent / delivered / failed / unknown
+- Process-death recovery: in-flight → unknown outcome, locked until user action
+- FLAG_SECURE (no screenshots), no key/body in logs, no SMS/contacts permissions
+- HTTPS-only, redirects disabled, no retry on ambiguous POST
 
-## CI evidence — run 44817889364 (SUCCESS)
+## CI evidence — run 44832827264 (SUCCESS)
 
-**Branch:** `feature/android-sms-foundation` (HEAD db2d108)  
-**Workflow run:** https://github.com/nexvary/Nexvary-SMS/actions/runs/44817889364  
-**Result:** BUILD SUCCESSFUL in 1m 4s  
-**Tests:** 27 unit tests (15 SmsPolicyTest + 12 TelnyxClientTest) — 0 failures  
-**Lint:** 0 errors, 13 warnings (warnings do not abort build)  
-**APK signature:** Verified using v2 scheme (APK Signature Scheme v2): **true**
+**Branch:** `feature/android-sms-foundation` (HEAD ab7c96c)
+**Workflow:** https://github.com/nexvary/Nexvary-SMS/actions/runs/44832827264
+**Result:** BUILD SUCCESSFUL in 1m 13s
+**Tests:** 27 unit tests (15 SmsPolicyTest + 12 TelnyxClientTest) — 0 failures
+**Lint:** 0 errors (warnings do not abort build)
+**APK signature:** Verified using v2 scheme (APK Signature Scheme v2): true
 
-## Installable APK artifact
+## Installable APK
 
-**Artifact name:** Nexvary-SMS-1.0.0-APK  
-**Download:** https://github.com/nexvary/Nexvary-SMS/actions/runs/44817889364 → Artifacts → Nexvary-SMS-1.0.0-APK  
-**Expires:** 2026-12-20  
-**APK SHA256:** `e7dff95ec25b1e81bf7cc3fb15389f6d322abafbaf5f5ad87088474c3840563c`  
-**Signing:** Android debug key (temporary, CI-generated). Not a production update key.
+**Artifact:** Nexvary-SMS-1.0.0-APK
+**Run:** https://github.com/nexvary/Nexvary-SMS/actions/runs/44832827264
+**APK size:** 1,362,436 bytes (~1.3 MB)
+**SHA256:** `461707620d4c6b652f6eec4c1ca780cee204abce8147310eecea31df224bcb42`
+**Signing:** Android debug key (temporary CI key — not a production release key)
+**Expires:** 2026-12-21
 
-## Tests added (TelnyxClientTest.java — 12 tests)
+## Unit tests (27 total, all passing)
 
-All tests use OkHttp MockWebServer. No real Telnyx key used. No paid SMS sent.
+**SmsPolicyTest (15):** normalization, prefix validation, GSM/Unicode part counting,
+extension chars × 2, emoji UTF-16 surrogates, UUID validation, injection rejection.
 
-| Test | Covers |
-|------|--------|
-| `sendBodyIsUtf8` | Arabic text in POST body, Content-Type charset=utf-8 |
-| `http422ReturnsErrorResult` | HTTP 422 → error Result with status code, no throw |
-| `http500ReturnsErrorResult` | HTTP 500 → error Result |
-| `invalidJsonThrows` | 200 + malformed JSON → Exception thrown |
-| `missingDataKeyThrows` | 200 + `{}` (no data key) → Exception thrown |
-| `noAutoRetryOnHttpError` | 503 → exactly 1 request (no retry) |
-| `connectionResetThrows` | Socket disconnect → Exception (no silent failure) |
-| `statusAccepted` | GET status returns "accepted", empty cost |
-| `statusSentDistinctFromAcceptedAndDelivered` | "sent" ≠ "accepted" ≠ "delivered" |
-| `statusDeliveredIncludesCost` | "delivered" + cost object → cost string populated |
-| `statusUsesGetNotPost` | Status lookup uses GET, no body |
-| `sendUsesPost` | Send uses POST |
+**TelnyxClientTest (12):** UTF-8 body, HTTP 422/500 error results, invalid JSON throws,
+missing data key throws, no auto-retry (request count = 1), connection reset throws,
+accepted/sent/delivered status distinction, cost parsing, GET/POST method assertions.
 
-## Test policy boundaries (SmsPolicyTest.java — 15 tests)
-Normalization, prefix validation, GSM/Unicode part counting, extension chars, emoji UTF-16 surrogates, UUID validation, injection rejection. All 15 pass unchanged.
+All tests use MockWebServer — no real Telnyx key, no paid SMS.
 
 ## Verification limits
 
-- Unit tests only: JVM, no Android emulator, no physical device.
-- No delivery test, no Keystore test (requires Android device/emulator), no UI rotation/process-death test (requires instrumented run).
-- APK is debug-signed by CI. Valid for personal testing; not for production distribution or long-term update delivery.
-- Sender, profile ID, and all security constraints from AGENTS.md preserved unchanged.
+- Unit tests only (JVM). No Android emulator or physical device tests performed.
+- Android Keystore not tested (requires a real device).
+- Rotation/process-kill lifecycle not tested with instrumented tests.
+- APK is debug-signed — not suitable for production distribution or long-term update delivery.
+- No delivery confirmation (Accepted/Sent ≠ Delivered — physical device required).
 - No AWS, FusionPBX, or other repository changes made.
+- No merge to main. No release published. No paid SMS sent.
 
-## Branch status
+## Branch / PR
 
-- Working branch: `feature/android-sms-foundation`
-- Open PR: https://github.com/nexvary/Nexvary-SMS/pull/1
-- No merge to main. No release published.
-- No concurrent agent work detected on this branch at time of commit.
+- Branch: `feature/android-sms-foundation`
+- PR: https://github.com/nexvary/Nexvary-SMS/pull/1 (open, awaiting review)
