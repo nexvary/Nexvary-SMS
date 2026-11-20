@@ -10,6 +10,8 @@ import java.nio.charset.StandardCharsets;
 
 
 final class TelnyxClient {
+    // Overrideable in same-package unit tests only; never log or expose at runtime.
+    static String BASE_URL = "https://api.telnyx.com/v2/messages";
     static final class Result {
         final String id, status, cost, error;
         Result(String id, String status, String cost, String error) { this.id=id; this.status=status; this.cost=cost; this.error=error; }
@@ -25,7 +27,7 @@ final class TelnyxClient {
         OkHttpClient client = new OkHttpClient.Builder().retryOnConnectionFailure(false)
             .followRedirects(false).followSslRedirects(false).connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS).callTimeout(45, TimeUnit.SECONDS).build();
-        Request.Builder request = new Request.Builder().url("https://api.telnyx.com/v2/messages" + suffix)
+        Request.Builder request = new Request.Builder().url(BASE_URL + suffix)
             .header("Authorization", "Bearer " + key).header("Accept", "application/json");
         if (body != null) request.post(RequestBody.create(body.toString().getBytes(StandardCharsets.UTF_8), MediaType.get("application/json; charset=utf-8")));
         else request.get();
