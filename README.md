@@ -1,0 +1,1 @@
+# Nexvary SMS\n\nAndroid application foundation for owner-authorized Telnyx business SMS. Development is on a separate feature branch; never commit API keys.\n
